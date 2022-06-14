@@ -29,18 +29,33 @@ import static org.apache.dubbo.common.constants.CommonConstants.REGISTRY_DELAY_N
  * @see org.apache.dubbo.registry.support.AbstractRegistry
  */
 public interface Registry extends Node, RegistryService {
+    /**
+     * 获取延迟
+     */
     default int getDelay() {
         return getUrl().getParameter(REGISTRY_DELAY_NOTIFICATION_KEY, DEFAULT_DELAY_NOTIFICATION_TIME);
     }
 
+    /**
+     * 是否呗服务发现
+     * @return
+     */
     default boolean isServiceDiscovery() {
         return false;
     }
 
+    /**
+     * 重新注册
+     * @param url
+     */
     default void reExportRegister(URL url) {
         register(url);
     }
 
+    /**
+     * 重新取消注册
+     * @param url
+     */
     default void reExportUnregister(URL url) {
         unregister(url);
     }

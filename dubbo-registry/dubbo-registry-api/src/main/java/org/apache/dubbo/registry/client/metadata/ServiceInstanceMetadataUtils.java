@@ -220,8 +220,9 @@ public class ServiceInstanceMetadataUtils {
     }
 
     public static void customizeInstance(ServiceInstance instance, ApplicationModel applicationModel) {
+        // 找出ServiceInstanceCustomizer接口实现类
         ExtensionLoader<ServiceInstanceCustomizer> loader =
-                instance.getOrDefaultApplicationModel().getExtensionLoader(ServiceInstanceCustomizer.class);
+            instance.getOrDefaultApplicationModel().getExtensionLoader(ServiceInstanceCustomizer.class);
         // FIXME, sort customizer before apply
         loader.getSupportedExtensionInstances().forEach(customizer -> {
             // customize

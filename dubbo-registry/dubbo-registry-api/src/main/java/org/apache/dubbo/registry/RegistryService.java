@@ -30,6 +30,7 @@ public interface RegistryService {
 
     /**
      * Register data, such as : provider service, consumer address, route rule, override rule and other data.
+     * 注册方法，可以注册 提供者服务、消费者地址、路由规则、覆盖规则等数据
      * <p>
      * Registering is required to support the contract:<br>
      * 1. When the URL sets the check=false parameter. When the registration fails, the exception is not thrown and retried in the background. Otherwise, the exception will be thrown.<br>
@@ -44,6 +45,7 @@ public interface RegistryService {
 
     /**
      * Unregister
+     * 解除注册方法
      * <p>
      * Unregistering is required to support the contract:<br>
      * 1. If it is the persistent stored data of dynamic=false, the registration data can not be found, then the IllegalStateException is thrown, otherwise it is ignored.<br>
@@ -55,6 +57,7 @@ public interface RegistryService {
 
     /**
      * Subscribe to eligible registered data and automatically push when the registered data is changed.
+     * 订阅方法
      * <p>
      * Subscribing need to support contracts:<br>
      * 1. When the URL sets the check=false parameter. When the registration fails, the exception is not thrown and retried in the background. <br>
@@ -72,6 +75,7 @@ public interface RegistryService {
 
     /**
      * Unsubscribe
+     * 取消订阅方法
      * <p>
      * Unsubscribing is required to support the contract:<br>
      * 1. If you don't subscribe, ignore it directly.<br>
@@ -84,6 +88,7 @@ public interface RegistryService {
 
     /**
      * Query the registered data that matches the conditions. Corresponding to the push mode of the subscription, this is the pull mode and returns only one result.
+     * 查询方法
      *
      * @param url Query condition, is not allowed to be empty, e.g. consumer://10.20.153.10/org.apache.dubbo.foo.BarService?version=1.0.0&application=kylin
      * @return The registered information list, which may be empty, the meaning is the same as the parameters of {@link org.apache.dubbo.registry.NotifyListener#notify(List<URL>)}.

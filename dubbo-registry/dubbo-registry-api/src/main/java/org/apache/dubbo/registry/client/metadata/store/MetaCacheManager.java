@@ -27,6 +27,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Metadata cache with limited size that uses LRU expiry policy.
+ * 元信息缓存管理器
  */
 public class MetaCacheManager extends AbstractCacheManager<MetadataInfo> {
     private static final String DEFAULT_FILE_NAME = ".metadata";

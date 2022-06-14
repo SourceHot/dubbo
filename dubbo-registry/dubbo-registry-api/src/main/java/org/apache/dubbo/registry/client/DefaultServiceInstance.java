@@ -16,21 +16,12 @@
  */
 package org.apache.dubbo.registry.client;
 
+import com.alibaba.fastjson.JSON;
 import org.apache.dubbo.metadata.MetadataInfo;
 import org.apache.dubbo.rpc.model.ApplicationModel;
 
-import com.alibaba.fastjson.JSON;
-
 import java.beans.Transient;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 
 import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.ENDPOINTS;
 import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.EXPORTED_SERVICES_REVISION_PROPERTY_NAME;
@@ -44,34 +35,72 @@ public class DefaultServiceInstance implements ServiceInstance {
 
     private static final long serialVersionUID = 1149677083747278100L;
 
+    /**
+     * 原地址
+     */
     private String rawAddress;
 
+    /**
+     * 服务名称
+     */
     private String serviceName;
 
+    /**
+     * host
+     */
     private String host;
 
+    /**
+     * 端口
+     */
     private int port;
 
+    /**
+     * 是否启用
+     */
     private boolean enabled = true;
 
+    /**
+     * 是否健康
+     */
     private boolean healthy = true;
 
+    /**
+     * 元信息
+     */
     private Map<String, String> metadata = new HashMap<>();
 
+    /**
+     * 地址
+     */
     private transient String address;
+    /**
+     * 服务元信息
+     */
     private transient MetadataInfo serviceMetadata;
 
     /**
      * used at runtime
+     * 注册集群的名称
      */
     private transient String registryCluster;
 
     /**
      * extendParams can be more flexible, but one single property uses less space
+     * 拓展参数表
      */
     private transient Map<String, String> extendParams;
+    /**
+     * 端点
+     */
     private transient List<Endpoint> endpoints;
+    /**
+     * 应用模型
+     */
     private transient ApplicationModel applicationModel;
+    /**
+     * 实例地址
+     */
     private transient InstanceAddressURL instanceAddressURL = null;
 
     public DefaultServiceInstance() {

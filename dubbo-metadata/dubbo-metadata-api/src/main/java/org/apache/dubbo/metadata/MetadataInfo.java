@@ -50,12 +50,18 @@ import static org.apache.dubbo.common.constants.CommonConstants.METHODS_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.TIMESTAMP_KEY;
 import static org.apache.dubbo.metadata.RevisionResolver.EMPTY_REVISION;
 
+/**
+ * 元数据
+ */
 public class MetadataInfo implements Serializable {
     public static final MetadataInfo EMPTY = new MetadataInfo();
     private static final Logger logger = LoggerFactory.getLogger(MetadataInfo.class);
 
     private String app;
     // revision that will report to registry or remote meta center, must always update together with rawMetadataInfo, check {@link this#calAndGetRevision}
+    /**
+     * 修订号
+     */
     private volatile String revision;
     // key format is '{group}/{interface name}:{version}:{protocol}'
     private final Map<String, ServiceInfo> services;

@@ -98,9 +98,11 @@ public class NacosNamingServiceUtils {
      * @since 2.7.5
      */
     public static NacosNamingServiceWrapper createNamingService(URL connectionURL) {
+        // 构建属性
         Properties nacosProperties = buildNacosProperties(connectionURL);
         NamingService namingService;
         try {
+            // 构建NamingService对象
             namingService = NacosFactory.createNamingService(nacosProperties);
         } catch (NacosException e) {
             if (logger.isErrorEnabled()) {
@@ -108,12 +110,16 @@ public class NacosNamingServiceUtils {
             }
             throw new IllegalStateException(e);
         }
+        // 构建NamingService对象的包装类
         return new NacosNamingServiceWrapper(namingService);
     }
 
     private static Properties buildNacosProperties(URL url) {
+        // 创建属性对象
         Properties properties = new Properties();
+        // 设置服务地址
         setServerAddr(url, properties);
+        // 设置用户名、密码和namingLoadCacheAtStart
         setProperties(url, properties);
         return properties;
     }

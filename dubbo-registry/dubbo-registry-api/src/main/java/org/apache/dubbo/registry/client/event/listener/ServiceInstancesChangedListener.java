@@ -64,6 +64,8 @@ import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataU
  * TODO, refactor to move revision-metadata mapping to ServiceDiscovery. Instances should have already been mapped with metadata when reached here.
  * <p>
  * The operations of ServiceInstancesChangedListener should be synchronized.
+ *
+ * 服务实例变化监听器
  */
 public class ServiceInstancesChangedListener {
 

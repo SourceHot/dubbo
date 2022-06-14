@@ -49,18 +49,48 @@ import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataU
  */
 public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
     private final Logger logger = LoggerFactory.getLogger(AbstractServiceDiscovery.class);
+    /**
+     * 是否摧毁
+     */
     private volatile boolean isDestroy;
 
+    /**
+     * 服务实例名称
+     */
     protected final String serviceName;
+    /**
+     * 服务实例
+     */
     protected volatile ServiceInstance serviceInstance;
+    /**
+     * 元信息
+     */
     protected volatile MetadataInfo metadataInfo;
+    /**
+     * 元信息报告
+     */
     protected MetadataReport metadataReport;
+    /**
+     * 元信息类型
+     */
     protected String metadataType;
+    /**
+     * 元信息缓存管理器
+     */
     protected final MetaCacheManager metaCacheManager;
+    /**
+     * 需要注册的URL
+     */
     protected URL registryURL;
 
+    /**
+     * 服务实例变化监听器
+     */
     protected Set<ServiceInstancesChangedListener> instanceListeners = new ConcurrentHashSet<>();
 
+    /**
+     * 应用模型
+     */
     protected ApplicationModel applicationModel;
 
     public AbstractServiceDiscovery(ApplicationModel applicationModel, URL registryURL) {
@@ -87,15 +117,21 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
     }
 
     public synchronized void register() throws RuntimeException {
+        // 构造服务实例
         this.serviceInstance = createServiceInstance(this.metadataInfo);
+        // 验证服务实例
         if (!isValidInstance(this.serviceInstance)) {
             logger.warn("No valid instance found, stop registering instance address to registry.");
             return;
         }
 
+        // 是否需要修订
         boolean revisionUpdated = calOrUpdateInstanceRevision(this.serviceInstance);
+        // 如果需要修订
         if (revisionUpdated) {
+            // 汇报元信息
             reportMetadata(this.metadataInfo);
+            // 执行注册（子类实现）
             doRegister(this.serviceInstance);
         }
     }
@@ -107,21 +143,28 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
      */
     @Override
     public synchronized void update() throws RuntimeException {
+        // 已经摧毁的情况下不做操作
         if (isDestroy) {
             return;
         }
 
+        // 服务实例为空的情况下创建服务实例
         if (this.serviceInstance == null) {
             this.serviceInstance = createServiceInstance(this.metadataInfo);
-        } else if (!isValidInstance(this.serviceInstance)) {
+        }
+        // 如果服务实例验证不通过进行定制化操作
+        else if (!isValidInstance(this.serviceInstance)) {
             ServiceInstanceMetadataUtils.customizeInstance(this.serviceInstance, this.applicationModel);
         }
 
+        // 如果服务实例验证不通过不做处理
         if (!isValidInstance(this.serviceInstance)) {
             return;
         }
 
+        // 确定是否需要修订服务实例
         boolean revisionUpdated = calOrUpdateInstanceRevision(this.serviceInstance);
+        // 需要则更新
         if (revisionUpdated) {
             logger.info(String.format("Metadata of instance changed, updating instance with revision %s.", this.serviceInstance.getServiceMetadata().getRevision()));
             doUpdate(this.serviceInstance);
@@ -150,27 +193,36 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
 
     @Override
     public MetadataInfo getRemoteMetadata(String revision, List<ServiceInstance> instances) {
+        // 从元信息缓存管理器中获取
         MetadataInfo metadata = metaCacheManager.get(revision);
 
+        // 如果元数据不为空并且元信息不是空的
         if (metadata != null && metadata != MetadataInfo.EMPTY) {
+            // 元数据初始化
             metadata.init();
             // metadata loaded from cache
             if (logger.isDebugEnabled()) {
                 logger.debug("MetadataInfo for revision=" + revision + ", " + metadata);
             }
+            // 返回元数据
             return metadata;
         }
 
         synchronized (metaCacheManager) {
             // try to load metadata from remote.
+            // 重试次数
             int triedTimes = 0;
+            // 重试次数小于3
             while (triedTimes < 3) {
+                // 获取远端元数据
                 metadata = MetadataUtils.getRemoteMetadata(revision, instances, metadataReport);
 
+                // 如果不是空的元数据进行初始化并结束循环
                 if (metadata != MetadataInfo.EMPTY) {// succeeded
                     metadata.init();
                     break;
                 } else {// failed
+                    // 如果重试次数大于0，重试次数累加1并暂停1秒进入下一次处理
                     if (triedTimes > 0) {
                         if (logger.isDebugEnabled()) {
                             logger.debug("Retry the " + triedTimes + " times to get metadata for revision=" + revision);
@@ -184,6 +236,7 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
                 }
             }
 
+            // 如果元信息为空记录异常日志，反之则将其放入到元信息缓存管理器中
             if (metadata == MetadataInfo.EMPTY) {
                 logger.error("Failed to get metadata for revision after 3 retries, revision=" + revision);
             } else {
@@ -236,10 +289,14 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
     }
 
     protected void doUpdate(ServiceInstance serviceInstance) throws RuntimeException {
+        // 取消注册
         this.unregister();
 
+        // 如果dubbo.metadata.revision属性不是0
         if (!EMPTY_REVISION.equals(getExportedServicesRevision(serviceInstance))) {
+            // 执行汇报元数据操作
             reportMetadata(serviceInstance.getServiceMetadata());
+            // 执行注册操作
             this.doRegister(serviceInstance);
         }
     }
@@ -255,20 +312,41 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
 
     protected abstract void doDestroy() throws Exception;
 
+    /**
+     * 构造服务实例
+     *
+     * @param metadataInfo
+     * @return
+     */
     protected ServiceInstance createServiceInstance(MetadataInfo metadataInfo) {
+        // 构造函数创建
         DefaultServiceInstance instance = new DefaultServiceInstance(serviceName, applicationModel);
+        // 设置元信息
         instance.setServiceMetadata(metadataInfo);
+        // 设置元信息存储类型
         setMetadataStorageType(instance, metadataType);
+        // 定制化服务实例
         ServiceInstanceMetadataUtils.customizeInstance(instance, applicationModel);
         return instance;
     }
 
+    /**
+     * 确定是否需要修订服务实例
+     *
+     * @param instance
+     * @return
+     */
     protected boolean calOrUpdateInstanceRevision(ServiceInstance instance) {
+        // 获取dubbo.metadata.revision对应的数据
         String existingInstanceRevision = getExportedServicesRevision(instance);
+        // 获取服务元信息
         MetadataInfo metadataInfo = instance.getServiceMetadata();
+        // 服务元信息计算新修订号
         String newRevision = metadataInfo.calAndGetRevision();
+        // 如果新修订号与扩展属性中的修订号不相同返回true
         if (!newRevision.equals(existingInstanceRevision)) {
-            instance.getMetadata().put(EXPORTED_SERVICES_REVISION_PROPERTY_NAME, metadataInfo.getRevision());
+            instance.getMetadata()
+                .put(EXPORTED_SERVICES_REVISION_PROPERTY_NAME, metadataInfo.getRevision());
             return true;
         }
         return false;
@@ -276,7 +354,11 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
 
     protected void reportMetadata(MetadataInfo metadataInfo) {
         if (metadataReport != null) {
+            // 创建元数据对象
             SubscriberMetadataIdentifier identifier = new SubscriberMetadataIdentifier(serviceName, metadataInfo.getRevision());
+            // 1. 元数据类型是local
+            // 2. 通过metadataReport确认是否需要汇报
+            // 3. 元数据类型是remote
             if ((DEFAULT_METADATA_STORAGE_TYPE.equals(metadataType) && metadataReport.shouldReportMetadata()) || REMOTE_METADATA_STORAGE_TYPE.equals(metadataType)) {
                 metadataReport.publishAppMetadata(identifier, metadataInfo);
             }
