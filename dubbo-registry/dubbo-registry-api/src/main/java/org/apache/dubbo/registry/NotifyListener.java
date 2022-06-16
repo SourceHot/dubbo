@@ -30,6 +30,7 @@ public interface NotifyListener {
 
     /**
      * Triggered when a service change notification is received.
+     * 通知方法
      * <p>
      * Notify needs to support the contract: <br>
      * 1. Always notifications on the service interface and the dimension of the data type. that is, won't notify part of the same type data belonging to one service. Users do not need to compare the results of the previous notification.<br>
@@ -42,13 +43,24 @@ public interface NotifyListener {
      */
     void notify(List<URL> urls);
 
+    /**
+     * 添加服务实例变化监听器
+     * @param instanceListener
+     */
     default void addServiceListener(ServiceInstancesChangedListener instanceListener) {
     }
 
+    /**
+     * 获取服务实例变化监听器
+     * @return
+     */
     default ServiceInstancesChangedListener getServiceListener() {
         return null;
     }
 
+    /**
+     * 获取定制后的URL
+     */
     default URL getConsumerUrl() {
         return null;
     }

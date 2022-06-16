@@ -55,6 +55,7 @@ public interface Constants {
 
     /**
      * To decide whether register center saves file synchronously, the default value is asynchronously
+     * 是否同步保存文件，默认异步保存
      */
     String REGISTRY_FILESAVE_SYNC_KEY = "save.file";
 

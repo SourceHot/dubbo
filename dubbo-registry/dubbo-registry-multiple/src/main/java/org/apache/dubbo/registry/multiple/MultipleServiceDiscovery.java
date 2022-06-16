@@ -49,10 +49,14 @@ public class MultipleServiceDiscovery implements ServiceDiscovery {
 
         Map<String, String> parameters = registryURL.getParameters();
         for (String key : parameters.keySet()) {
+                // key 是以 child. 为开头
             if (key.startsWith(REGISTRY_PREFIX_KEY)) {
+                // 添加参数application参数和registry-type参数
                 URL url = URL.valueOf(registryURL.getParameter(key)).addParameter(CommonConstants.APPLICATION_KEY, applicationName)
                     .addParameter(REGISTRY_TYPE, SERVICE);
+                // 通过ServiceDiscoveryFactory获取ServiceDiscovery
                 ServiceDiscovery serviceDiscovery = ServiceDiscoveryFactory.getExtension(url).getServiceDiscovery(url);
+                // 放入到服务发现器容器中
                 serviceDiscoveries.put(key, serviceDiscovery);
             }
         }
@@ -184,6 +188,8 @@ public class MultipleServiceDiscovery implements ServiceDiscovery {
         public void onEvent(ServiceInstancesChangedEvent event) {
             List<ServiceInstance> serviceInstances = new ArrayList<>();
             for (SingleServiceInstancesChangedListener singleListener : singleListenerMap.values()) {
+                // 1. 事件不为空
+                // 2. 事件中的服务实例不为空
                 if (null != singleListener.event && null != singleListener.event.getServiceInstances()) {
                     for (ServiceInstance serviceInstance : singleListener.event.getServiceInstances()) {
                         if (!serviceInstances.contains(serviceInstance)) {

@@ -140,8 +140,10 @@ public class ZookeeperServiceDiscovery extends AbstractServiceDiscovery {
     }
 
     protected void registerServiceWatcher(String serviceName, ServiceInstancesChangedListener listener) {
+        // 构建服务Zookeeper中的节点地址
         String path = buildServicePath(serviceName);
         try {
+            // 创建地址
             curatorFramework.create().creatingParentsIfNeeded().forPath(path);
         } catch (KeeperException.NodeExistsException e) {
             // ignored
@@ -153,7 +155,9 @@ public class ZookeeperServiceDiscovery extends AbstractServiceDiscovery {
         }
 
         CountDownLatch latch = new CountDownLatch(1);
+        // 向观察者加入一个观察者
         ZookeeperServiceDiscoveryChangeWatcher watcher = watcherCaches.computeIfAbsent(path, key -> {
+            // 构造观察者并将其使用
             ZookeeperServiceDiscoveryChangeWatcher tmpWatcher = new ZookeeperServiceDiscoveryChangeWatcher(this, serviceName, path, latch);
             try {
                 curatorFramework.getChildren().usingWatcher(tmpWatcher).forPath(path);
@@ -167,7 +171,10 @@ public class ZookeeperServiceDiscovery extends AbstractServiceDiscovery {
             }
             return tmpWatcher;
         });
+
+        // 在观察者中加入监听器
         watcher.addListener(listener);
+        // 触发事件
         listener.onEvent(new ServiceInstancesChangedEvent(serviceName, this.getInstances(serviceName)));
         latch.countDown();
     }

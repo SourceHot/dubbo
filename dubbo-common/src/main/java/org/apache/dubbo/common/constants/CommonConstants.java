@@ -350,6 +350,7 @@ public interface CommonConstants {
 
     /**
      * Whether to cache locally, default is true
+     * 是否在本地使用文件缓存
      */
     String REGISTRY_LOCAL_FILE_CACHE_ENABLED = "file.cache";
 

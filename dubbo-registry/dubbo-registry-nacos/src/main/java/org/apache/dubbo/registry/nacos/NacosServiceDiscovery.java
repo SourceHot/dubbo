@@ -17,6 +17,7 @@
 package org.apache.dubbo.registry.nacos;
 
 import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.function.ThrowableConsumer;
 import org.apache.dubbo.common.function.ThrowableFunction;
 import org.apache.dubbo.common.logger.Logger;
 import org.apache.dubbo.common.logger.LoggerFactory;
@@ -114,7 +115,7 @@ public class NacosServiceDiscovery extends AbstractServiceDiscovery {
         if (!instanceListeners.add(listener)) {
             return;
         }
-        execute(namingService, service -> listener.getServiceNames().forEach(serviceName -> {
+        ThrowableConsumer.execute(namingService, service -> listener.getServiceNames().forEach(serviceName -> {
             try {
                 service.subscribe(serviceName, Constants.DEFAULT_GROUP, e -> { // Register Nacos EventListener
                     if (e instanceof NamingEvent) {

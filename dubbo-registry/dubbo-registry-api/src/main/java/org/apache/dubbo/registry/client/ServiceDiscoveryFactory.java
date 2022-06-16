@@ -34,6 +34,7 @@ public interface ServiceDiscoveryFactory {
     /**
      * Get the instance of {@link ServiceDiscovery}
      *
+     * 根据url获取ServiceDiscovery
      * @param registryURL the {@link URL} to connect the registry
      * @param model, the application model context
      * @return non-null
@@ -43,6 +44,7 @@ public interface ServiceDiscoveryFactory {
     /**
      * Get the extension instance of {@link ServiceDiscoveryFactory} by {@link URL#getProtocol() the protocol}
      *
+     * 通过url中的协议获取对应的ServiceDiscoveryFactory拓展
      * @param registryURL the {@link URL} to connect the registry
      * @return non-null
      */

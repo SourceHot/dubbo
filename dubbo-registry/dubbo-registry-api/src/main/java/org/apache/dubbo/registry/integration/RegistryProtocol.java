@@ -221,14 +221,18 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
 
     @Override
     public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcException {
+        // 从originInvoker中提取注册地址
         URL registryUrl = getRegistryUrl(originInvoker);
         // url to export locally
+
+        // 从originInvoker中提取提供方地址
         URL providerUrl = getProviderUrl(originInvoker);
 
         // Subscribe the override data
         // FIXME When the provider subscribes, it will affect the scene : a certain JVM exposes the service and call
         //  the same service. Because the subscribed is cached key with the name of the service, it causes the
         //  subscription information to cover.
+
         final URL overrideSubscribeUrl = getSubscribedOverrideUrl(providerUrl);
         final OverrideListener overrideSubscribeListener = new OverrideListener(overrideSubscribeUrl, originInvoker);
         Map<URL, NotifyListener> overrideListeners = getProviderConfigurationListener(providerUrl).getOverrideListeners();
@@ -236,19 +240,25 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
 
         providerUrl = overrideUrlWithConfig(providerUrl, overrideSubscribeListener);
         //export invoker
+        // 暴露服务
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker, providerUrl);
 
         // url to registry
+        // 获取注册对象
         final Registry registry = getRegistry(registryUrl);
+        // 注册提供者URL
         final URL registeredProviderUrl = getUrlToRegistry(providerUrl, registryUrl);
 
         // decide if we need to delay publish (provider itself and registry should both need to register)
+        // 确认是否需要注册
         boolean register = providerUrl.getParameter(REGISTER_KEY, true) && registryUrl.getParameter(REGISTER_KEY, true);
         if (register) {
+            // 注册
             register(registry, registeredProviderUrl);
         }
 
         // register stated url on provider model
+        // 添加 RegisterStatedURL 对象
         registerStatedUrl(registryUrl, registeredProviderUrl, register);
 
 
@@ -260,6 +270,7 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
             registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);
         }
 
+        // 通知暴露
         notifyExport(exporter);
         //Ensure that a new exporter instance is returned every time export
         return new DestroyableExporter<>(exporter);
@@ -729,13 +740,16 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
                 return;
             }
 
+            // 获取配置集合
             this.configurators = Configurator.toConfigurators(classifyUrls(matchedUrls, UrlUtils::isConfigurator))
                 .orElse(configurators);
 
+            // 窒息覆盖操作
             doOverrideIfNecessary();
         }
 
         public synchronized void doOverrideIfNecessary() {
+            // 确认Invoker接口
             final Invoker<?> invoker;
             if (originInvoker instanceof InvokerDelegate) {
                 invoker = ((InvokerDelegate<?>) originInvoker).getInvoker();
@@ -743,23 +757,32 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
                 invoker = originInvoker;
             }
             //The origin invoker
+            // 获取远端URL
             URL originUrl = RegistryProtocol.this.getProviderUrl(invoker);
+            // 生成缓存key
             String key = getCacheKey(originInvoker);
+            // 从缓存中获取key对应的ExporterChangeableWrapper
             ExporterChangeableWrapper<?> exporter = bounds.get(key);
             if (exporter == null) {
                 logger.warn(new IllegalStateException("error state, exporter should not be null"));
                 return;
             }
             //The current, may have been merged many times
+            // 从ExporterChangeableWrapper中获取invoker
             Invoker<?> exporterInvoker = exporter.getInvoker();
+            // 确认url
             URL currentUrl = exporterInvoker == null ? null : exporterInvoker.getUrl();
             //Merged with this configuration
+            // 将配置集合与url合并得到新的url
             URL newUrl = getConfiguredInvokerUrl(configurators, originUrl);
+            // 进一步配置url
             newUrl = getConfiguredInvokerUrl(getProviderConfigurationListener(originUrl).getConfigurators(), newUrl);
             newUrl = getConfiguredInvokerUrl(serviceConfigurationListeners.get(originUrl.getServiceKey())
                 .getConfigurators(), newUrl);
             if (!newUrl.equals(currentUrl)) {
+                // url中存在need-reexport配置数值为true
                 if (newUrl.getParameter(Constants.NEED_REEXPORT, true)) {
+                    // 重新导出
                     RegistryProtocol.this.reExport(originInvoker, newUrl);
                 }
                 logger.info("exported provider url changed, origin url: " + originUrl +

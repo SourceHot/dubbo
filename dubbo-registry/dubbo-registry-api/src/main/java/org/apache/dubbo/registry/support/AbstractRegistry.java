@@ -91,23 +91,48 @@ public abstract class AbstractRegistry implements Registry {
     private final ConcurrentMap<URL, Set<NotifyListener>> subscribed = new ConcurrentHashMap<>();
     private final ConcurrentMap<URL, Map<String, List<URL>>> notified = new ConcurrentHashMap<>();
     // Is it synchronized to save the file
+    /**
+     * 是否同步保存文件
+     */
     private boolean syncSaveFile;
+    /**
+     * 注册地址
+     */
     private URL registryUrl;
     // Local disk cache file
+    /**
+     * 本地缓存文件
+     */
     private File file;
+    /**
+     * 是否启用本地缓存
+     */
     private boolean localCacheEnabled;
+    /**
+     * 注册管理器
+     */
     protected RegistryManager registryManager;
+    /**
+     * 应用模型
+     */
     protected ApplicationModel applicationModel;
 
     public AbstractRegistry(URL url) {
+        // 设置URL
         setUrl(url);
+        // 获取RegistryManager对象
         registryManager = url.getOrDefaultApplicationModel().getBeanFactory().getBean(RegistryManager.class);
+        // 获取URL中的file.cache参数，是否在本地使用文件缓存
         localCacheEnabled = url.getParameter(REGISTRY_LOCAL_FILE_CACHE_ENABLED, true);
+        // 获取线程执行器
         registryCacheExecutor = url.getOrDefaultFrameworkModel().getBeanFactory()
             .getBean(FrameworkExecutorRepository.class).getSharedExecutor();
+        // 启用本地缓存
         if (localCacheEnabled) {
             // Start file save timer
+            // 获取URL中的save.file参数
             syncSaveFile = url.getParameter(REGISTRY_FILESAVE_SYNC_KEY, false);
+            // 构造缓存文件
             String defaultFilename = System.getProperty(USER_HOME) + DUBBO_REGISTRY +
                 url.getApplication() + "-" + url.getAddress().replaceAll(":", "-") + CACHE;
             String filename = url.getParameter(FILE_KEY, defaultFilename);
@@ -123,7 +148,9 @@ public abstract class AbstractRegistry implements Registry {
             this.file = file;
             // When starting the subscription center,
             // we need to read the local cache file for future Registry fault tolerance processing.
+            // 加载配置信息
             loadProperties();
+            // 触发通知
             notify(url.getBackupUrls());
         }
     }
@@ -293,10 +320,13 @@ public abstract class AbstractRegistry implements Registry {
     @Override
     public List<URL> lookup(URL url) {
         List<URL> result = new ArrayList<>();
+        // 获取通知对象
         Map<String, List<URL>> notifiedUrls = getNotified().get(url);
+        // 如果通知对象不为空
         if (CollectionUtils.isNotEmptyMap(notifiedUrls)) {
             for (List<URL> urls : notifiedUrls.values()) {
                 for (URL u : urls) {
+                    // 协议不是empty将其加入到结果集合中
                     if (!EMPTY_PROTOCOL.equals(u.getProtocol())) {
                         result.add(u);
                     }
@@ -305,10 +335,12 @@ public abstract class AbstractRegistry implements Registry {
         } else {
             final AtomicReference<List<URL>> reference = new AtomicReference<>();
             NotifyListener listener = reference::set;
+            // 执行订阅方法
             subscribe(url, listener); // Subscribe logic guarantees the first notify to return
             List<URL> urls = reference.get();
             if (CollectionUtils.isNotEmpty(urls)) {
                 for (URL u : urls) {
+                    // 协议不是empty将其加入到结果集合中
                     if (!EMPTY_PROTOCOL.equals(u.getProtocol())) {
                         result.add(u);
                     }
@@ -355,6 +387,7 @@ public abstract class AbstractRegistry implements Registry {
         if (logger.isInfoEnabled()) {
             logger.info("Subscribe: " + url);
         }
+        // 订阅容器中加入数据
         Set<NotifyListener> listeners = subscribed.computeIfAbsent(url, n -> new ConcurrentHashSet<>());
         listeners.add(listener);
     }
@@ -434,10 +467,13 @@ public abstract class AbstractRegistry implements Registry {
      * Notify changes from the Provider side.
      *
      * @param url      consumer side url
+     *                 消费端url
      * @param listener listener
      * @param urls     provider latest urls
+     * 生产端 url
      */
     protected void notify(URL url, NotifyListener listener, List<URL> urls) {
+        // url为空抛出异常
         if (url == null) {
             throw new IllegalArgumentException("notify url == null");
         }
@@ -456,6 +492,7 @@ public abstract class AbstractRegistry implements Registry {
         Map<String, List<URL>> result = new HashMap<>();
         for (URL u : urls) {
             if (UrlUtils.isMatch(url, u)) {
+                // 从URL中获取category
                 String category = u.getCategory(DEFAULT_CATEGORY);
                 List<URL> categoryList = result.computeIfAbsent(category, k -> new ArrayList<>());
                 categoryList.add(u);

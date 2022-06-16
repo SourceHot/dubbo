@@ -71,20 +71,53 @@ public class ServiceInstancesChangedListener {
 
     private static final Logger logger = LoggerFactory.getLogger(ServiceInstancesChangedListener.class);
 
+    /**
+     * 服务名称集合
+     */
     protected final Set<String> serviceNames;
+    /**
+     * 服务发现器
+     */
     protected final ServiceDiscovery serviceDiscovery;
+    /**
+     * 路由地址
+     */
     protected URL url;
+    /**
+     * key: 服务名称
+     * value: 通知监听
+     */
     protected Map<String, Set<NotifyListenerWithKey>> listeners;
 
+    /**
+     * 是否摧毁
+     */
     protected AtomicBoolean destroyed = new AtomicBoolean(false);
 
+    /**
+     * key: 服务名称
+     * value: 服务实例集合
+     */
     protected Map<String, List<ServiceInstance>> allInstances;
+    /**
+     * key：服务名称
+     * vlaue：服务地址
+     */
     protected Map<String, Object> serviceUrls;
 
+    /**
+     * 最后刷新时间
+     */
     private volatile long lastRefreshTime;
+    /**
+     * 重试信号量
+     */
     private final Semaphore retryPermission;
     private volatile ScheduledFuture<?> retryFuture;
     private final ScheduledExecutorService scheduler;
+    /**
+     * 是否存在空的元数据
+     */
     private volatile boolean hasEmptyMetadata;
 
     // protocols subscribe by default, specify the protocol that should be subscribed through 'consumer.protocol'.
@@ -108,9 +141,13 @@ public class ServiceInstancesChangedListener {
      * @param event {@link ServiceInstancesChangedEvent}
      */
     public void onEvent(ServiceInstancesChangedEvent event) {
+        // 没有摧毁
+        // 事件中的服务名称在受理范围内
+        // 时间没有过期
         if (destroyed.get() || !accept(event) || isRetryAndExpired(event)) {
             return;
         }
+        // 执行
         doOnEvent(event);
     }
 
@@ -118,9 +155,13 @@ public class ServiceInstancesChangedListener {
      * @param event
      */
     private synchronized void doOnEvent(ServiceInstancesChangedEvent event) {
+        // 没有摧毁
+        // 事件中的服务名称在受理范围内
+        // 没有过期
         if (destroyed.get() || !accept(event) || isRetryAndExpired(event)) {
             return;
         }
+
 
         refreshInstance(event);
 
@@ -128,10 +169,21 @@ public class ServiceInstancesChangedListener {
             logger.debug(event.getServiceInstances().toString());
         }
 
+        /**
+         * key:修订版本号
+         * value:服务实例
+         */
         Map<String, List<ServiceInstance>> revisionToInstances = new HashMap<>();
+        /**
+         * key: protocol
+         * value:
+         *  key: protocolServiceKey
+         *  value: revision
+         */
         Map<String, Map<String, Set<String>>> localServiceToRevisions = new HashMap<>();
 
         // grouping all instances of this app(service name) by revision
+        // 遍历allInstances集合，将其转换到revisionToInstances容器中
         for (Map.Entry<String, List<ServiceInstance>> entry : allInstances.entrySet()) {
             List<ServiceInstance> instances = entry.getValue();
             for (ServiceInstance instance : instances) {
@@ -148,12 +200,16 @@ public class ServiceInstancesChangedListener {
         }
 
         // get MetadataInfo with revision
+        // 遍历revisionToInstances集合，将其转换到localServiceToRevisions容器中
         for (Map.Entry<String, List<ServiceInstance>> entry : revisionToInstances.entrySet()) {
             String revision = entry.getKey();
             List<ServiceInstance> subInstances = entry.getValue();
+            // 获取远端元信息
             MetadataInfo metadata = serviceDiscovery.getRemoteMetadata(revision, subInstances);
+            // 处理元信息，将数据放入到localServiceToRevisions容器
             parseMetadata(revision, metadata, localServiceToRevisions);
             // update metadata into each instance, in case new instance created.
+            // 更新subInstances容器中的元数据
             for (ServiceInstance tmpInstance : subInstances) {
                 MetadataInfo originMetadata = tmpInstance.getServiceMetadata();
                 if (originMetadata == null || !Objects.equals(originMetadata.getRevision(), metadata.getRevision())) {
@@ -162,25 +218,37 @@ public class ServiceInstancesChangedListener {
             }
         }
 
+        // 服务实例中存在几个空的元数据
         int emptyNum = hasEmptyMetadata(revisionToInstances);
+
         if (emptyNum != 0) {// retry every 10 seconds
+            // 是否存在空的元数据设置为真
             hasEmptyMetadata = true;
             if (retryPermission.tryAcquire()) {
                 if (retryFuture != null && !retryFuture.isDone()) {
                     // cancel last retryFuture because only one retryFuture will be canceled at destroy().
                     retryFuture.cancel(true);
                 }
+                // 创建刷新地址任务
                 retryFuture = scheduler.schedule(new AddressRefreshRetryTask(retryPermission, event.getServiceName()), 10_000L, TimeUnit.MILLISECONDS);
                 logger.warn("Address refresh try task submitted");
             }
             // return if all metadata is empty, this notification will not take effect.
+            // 服务实例中空的元数据数量和服务实例总数相同结束处理
             if (emptyNum == revisionToInstances.size()) {
                 logger.error("Address refresh failed because of Metadata Server failure, wait for retry or new address refresh event.");
                 return;
             }
         }
+        // 是否存在空的元数据设置为假
         hasEmptyMetadata = false;
 
+        /**
+         * key: 协议
+         * value:
+         *  key: revisions
+         *  value: urls
+         */
         Map<String, Map<Set<String>, Object>> protocolRevisionsToUrls = new HashMap<>();
         Map<String, Object> newServiceUrls = new HashMap<>();
         for (Map.Entry<String, Map<String, Set<String>>> entry : localServiceToRevisions.entrySet()) {
@@ -189,6 +257,7 @@ public class ServiceInstancesChangedListener {
                 Map<Set<String>, Object> revisionsToUrls = protocolRevisionsToUrls.computeIfAbsent(protocol, k -> new HashMap<>());
                 Object urls = revisionsToUrls.get(revisions);
                 if (urls == null) {
+                    // 获取服务地址
                     urls = getServiceUrlsCache(revisionToInstances, revisions, protocol);
                     revisionsToUrls.put(revisions, urls);
                 }
@@ -197,7 +266,9 @@ public class ServiceInstancesChangedListener {
             });
         }
 
+        // 服务地址
         this.serviceUrls = newServiceUrls;
+        // 通知地址变化
         this.notifyAddressChanged();
     }
 
@@ -292,6 +363,7 @@ public class ServiceInstancesChangedListener {
     }
 
     protected boolean isRetryAndExpired(ServiceInstancesChangedEvent event) {
+        //
         if (event instanceof RetryServiceInstancesChangedEvent) {
             RetryServiceInstancesChangedEvent retryEvent = (RetryServiceInstancesChangedEvent) event;
             logger.warn("Received address refresh retry event, " + retryEvent.getFailureRecordTime());
@@ -304,32 +376,50 @@ public class ServiceInstancesChangedListener {
         return false;
     }
 
+    /**
+     * 刷新实例，将allInstances重新设置
+     *
+     * @param event
+     */
     private void refreshInstance(ServiceInstancesChangedEvent event) {
+        // 如果事件是RetryServiceInstancesChangedEvent类型不做处理
         if (event instanceof RetryServiceInstancesChangedEvent) {
             return;
         }
+        // 获取服务名称
         String appName = event.getServiceName();
+        // 获取实例集合
         List<ServiceInstance> appInstances = event.getServiceInstances();
         logger.info("Received instance notification, serviceName: " + appName + ", instances: " + appInstances.size());
+        // 加入到allInstances
         allInstances.put(appName, appInstances);
+        // 最后刷新时间
         lastRefreshTime = System.currentTimeMillis();
     }
 
     /**
      * Calculate the number of revisions that failed to find metadata info.
+     * <p>
+     * 获取元数据修订失败的数量
      *
      * @param revisionToInstances instance list classified by revisions
      * @return the number of revisions that failed at fetching MetadataInfo
      */
     protected int hasEmptyMetadata(Map<String, List<ServiceInstance>> revisionToInstances) {
+        // 如果修订服务实例集合为空，返回0
         if (revisionToInstances == null) {
             return 0;
         }
 
         StringBuilder builder = new StringBuilder();
+        // 计数器
         int emptyMetadataNum = 0;
+        // 循环revisionToInstances变量
         for (Map.Entry<String, List<ServiceInstance>> entry : revisionToInstances.entrySet()) {
             DefaultServiceInstance serviceInstance = (DefaultServiceInstance) entry.getValue().get(0);
+            // 满足以下条件中的一个计数器累加1
+            // 1. 服务实例为空
+            // 2. 服务实例元信息对象为空
             if (serviceInstance == null || serviceInstance.getServiceMetadata() == MetadataInfo.EMPTY) {
                 emptyMetadataNum++;
             }
@@ -351,7 +441,9 @@ public class ServiceInstancesChangedListener {
     protected Map<String, Map<String, Set<String>>> parseMetadata(String revision, MetadataInfo metadata, Map<String, Map<String, Set<String>>> localServiceToRevisions) {
         Map<String, ServiceInfo> serviceInfos = metadata.getServices();
         for (Map.Entry<String, ServiceInfo> entry : serviceInfos.entrySet()) {
+            // 协议(zookeeper等)
             String protocol = entry.getValue().getProtocol();
+
             String protocolServiceKey = entry.getValue().getMatchKey();
             Map<String, Set<String>> map = localServiceToRevisions.computeIfAbsent(protocol, _p -> new HashMap<>());
             Set<String> set = map.computeIfAbsent(protocolServiceKey, _k -> new TreeSet<>());
@@ -387,17 +479,24 @@ public class ServiceInstancesChangedListener {
      * race condition is protected by onEvent/doOnEvent
      */
     protected void notifyAddressChanged() {
-        listeners.forEach((serviceKey, listenerSet) -> {
+        // 循环事件监听器
+        listeners.forEach((String serviceKey, Set<NotifyListenerWithKey> listenerSet) -> {
             if (listenerSet != null) {
+                // 如果 NotifyListenerWithKey 集合数量为1
                 if (listenerSet.size() == 1) {
+                    // 获取 NotifyListenerWithKey
                     NotifyListenerWithKey listenerWithKey = listenerSet.iterator().next();
                     String protocolServiceKey = listenerWithKey.getProtocolServiceKey();
                     NotifyListener notifyListener = listenerWithKey.getNotifyListener();
                     //FIXME, group wildcard match
+                    // 做地址转换
                     List<URL> urls = toUrlsWithEmpty(getAddresses(protocolServiceKey, notifyListener.getConsumerUrl()));
                     logger.info("Notify service " + serviceKey + " with urls " + urls.size());
+                    // 执行通知
                     notifyListener.notify(urls);
-                } else {
+                }
+                // 其他情况
+                else {
                     List<URL> urls = new ArrayList<>();
                     NotifyListener notifyListener = null;
                     for (NotifyListenerWithKey listenerWithKey : listenerSet) {

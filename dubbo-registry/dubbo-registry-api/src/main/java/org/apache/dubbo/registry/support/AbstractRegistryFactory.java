@@ -57,11 +57,18 @@ public abstract class AbstractRegistryFactory implements RegistryFactory, ScopeM
                 "Please check if `setApplicationModel` has been override.");
         }
 
+        // 从注册管理器中获取注册对象
         Registry defaultNopRegistry = registryManager.getDefaultNopRegistryIfDestroyed();
         if (null != defaultNopRegistry) {
             return defaultNopRegistry;
         }
 
+        // 对参数URL进行处理，
+        // 1. path 属性
+        // 2. 添加参数interface
+        // 3. 移除参数timestamp
+        // 4. 移除属性export
+        // 5. 移除属性refer
         url = URLBuilder.from(url)
             .setPath(RegistryService.class.getName())
             .addParameter(INTERFACE_KEY, RegistryService.class.getName())
@@ -69,23 +76,29 @@ public abstract class AbstractRegistryFactory implements RegistryFactory, ScopeM
             .removeAttribute(EXPORT_KEY)
             .removeAttribute(REFER_KEY)
             .build();
+        // 创建缓存key
         String key = createRegistryCacheKey(url);
         Registry registry = null;
+        // 确认是否检查
         boolean check = url.getParameter(CHECK_KEY, true) && url.getPort() != 0;
         // Lock the registry access process to ensure a single instance of the registry
+        // 上锁
         registryManager.getRegistryLock().lock();
         try {
             // double check
             // fix https://github.com/apache/dubbo/issues/7265.
+            // 从注册管理器中获取默认的注册对象
             defaultNopRegistry = registryManager.getDefaultNopRegistryIfDestroyed();
             if (null != defaultNopRegistry) {
                 return defaultNopRegistry;
             }
+            // 从注册管理器中获取
             registry = registryManager.getRegistry(key);
             if (registry != null) {
                 return registry;
             }
             //create registry by spi/ioc
+            // 创建
             registry = createRegistry(url);
         } catch (Exception e) {
             if (check) {
@@ -102,6 +115,7 @@ public abstract class AbstractRegistryFactory implements RegistryFactory, ScopeM
             throw new IllegalStateException("Can not create registry " + url);
         }
 
+        // 加入到注册管理器中
         if (registry != null) {
             registryManager.putRegistry(key, registry);
         }
