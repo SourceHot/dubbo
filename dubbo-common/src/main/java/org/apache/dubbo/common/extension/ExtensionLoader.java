@@ -98,12 +98,24 @@ public class ExtensionLoader<T> {
 
     private static final Pattern NAME_SEPARATOR = Pattern.compile("\\s*[,]+\\s*");
 
+    /**
+     * 拓展类和拓展实例映射
+     */
     private final ConcurrentMap<Class<?>, Object> extensionInstances = new ConcurrentHashMap<>(64);
 
+    /**
+     * 拓展类
+     */
     private final Class<?> type;
 
+    /**
+     * 拓展注入器
+     */
     private final ExtensionInjector injector;
 
+    /**
+     * 拓展类和名称的映射
+     */
     private final ConcurrentMap<Class<?>, String> cachedNames = new ConcurrentHashMap<>();
 
     private final Holder<Map<String, Class<?>>> cachedClasses = new Holder<>();
@@ -112,15 +124,27 @@ public class ExtensionLoader<T> {
     private final Map<String, Set<String>> cachedActivateGroups = Collections.synchronizedMap(new LinkedHashMap<>());
     private final Map<String, String[][]> cachedActivateValues = Collections.synchronizedMap(new LinkedHashMap<>());
     private final ConcurrentMap<String, Holder<Object>> cachedInstances = new ConcurrentHashMap<>();
+    /**
+     * 自适应拓展实例缓存
+     */
     private final Holder<Object> cachedAdaptiveInstance = new Holder<>();
     private volatile Class<?> cachedAdaptiveClass = null;
     private String cachedDefaultName;
+    /**
+     * 创建自适应实例错误
+     */
     private volatile Throwable createAdaptiveInstanceError;
 
     private Set<Class<?>> cachedWrapperClasses;
 
+    /**
+     * 异常容器
+     */
     private Map<String, IllegalStateException> exceptions = new ConcurrentHashMap<>();
 
+    /**
+     * 加载策略集合
+     */
     private static volatile LoadingStrategy[] strategies = loadLoadingStrategies();
 
     /**
@@ -129,6 +153,9 @@ public class ExtensionLoader<T> {
     private Set<String> unacceptableExceptions = new ConcurrentHashSet<>();
     private ExtensionDirector extensionDirector;
     private List<ExtensionPostProcessor> extensionPostProcessors;
+    /**
+     * 实例化策略
+     */
     private InstantiationStrategy instantiationStrategy;
     private ActivateComparator activateComparator;
     private ScopeModel scopeModel;
@@ -165,13 +192,20 @@ public class ExtensionLoader<T> {
     }
 
     ExtensionLoader(Class<?> type, ExtensionDirector extensionDirector, ScopeModel scopeModel) {
+        // 设置类型
         this.type = type;
+        // 设置扩展管理器
         this.extensionDirector = extensionDirector;
+        // 获取扩展处理器（ExtensionPostProcessor）
         this.extensionPostProcessors = extensionDirector.getExtensionPostProcessors();
+        // 初始化InstantiationStrategy接口
         initInstantiationStrategy();
+        // 初始化拓展注入器
         this.injector = (type == ExtensionInjector.class ? null : extensionDirector.getExtensionLoader(ExtensionInjector.class)
             .getAdaptiveExtension());
+        // 初始化比较器
         this.activateComparator = new ActivateComparator(extensionDirector);
+        // 设置作用域
         this.scopeModel = scopeModel;
     }
 
@@ -671,19 +705,31 @@ public class ExtensionLoader<T> {
         }
     }
 
+    /**
+     * 获取自适应扩展
+     *
+     * @return
+     */
     @SuppressWarnings("unchecked")
     public T getAdaptiveExtension() {
+        // 检查是否摧毁
         checkDestroyed();
+        // 从自适应拓展实例缓存中获取扩展实例
         Object instance = cachedAdaptiveInstance.get();
+        // 扩展实例为空
         if (instance == null) {
+            // 创建自适应实例错误不为空抛出异常
             if (createAdaptiveInstanceError != null) {
                 throw new IllegalStateException("Failed to create adaptive instance: " +
                     createAdaptiveInstanceError.toString(),
                     createAdaptiveInstanceError);
             }
 
+            // 锁
             synchronized (cachedAdaptiveInstance) {
+                // 从自适应拓展实例缓存中获取扩展实例
                 instance = cachedAdaptiveInstance.get();
+                // 扩展实例为空的情况下创建并放入到自适应拓展实例缓存
                 if (instance == null) {
                     try {
                         instance = createAdaptiveExtension();

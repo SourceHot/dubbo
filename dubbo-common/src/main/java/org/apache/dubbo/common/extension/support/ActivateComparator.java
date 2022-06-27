@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * OrderComparator
+ * 比较器
  */
 public class ActivateComparator implements Comparator<Class<?>> {
 
@@ -54,8 +55,11 @@ public class ActivateComparator implements Comparator<Class<?>> {
             return 0;
         }
 
+
+        //
         Class<?> inf = findSpi(o1);
 
+        // 获取注解Activate对应的信息类
         ActivateInfo a1 = parseActivate(o1);
         ActivateInfo a2 = parseActivate(o2);
 

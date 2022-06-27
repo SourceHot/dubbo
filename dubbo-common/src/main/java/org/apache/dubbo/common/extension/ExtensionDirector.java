@@ -35,12 +35,37 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class ExtensionDirector implements ExtensionAccessor {
 
+    /**
+     * 拓展加载容器
+     * key:扩展类
+     * value: 扩展加载器
+     */
     private final ConcurrentMap<Class<?>, ExtensionLoader<?>> extensionLoadersMap = new ConcurrentHashMap<>(64);
+    /**
+     * 拓展作用域容器
+     * key:扩展类
+     * value: 扩展作用范围
+     */
     private final ConcurrentMap<Class<?>, ExtensionScope> extensionScopeMap = new ConcurrentHashMap<>(64);
+    /**
+     * 父扩展管理器
+     */
     private final ExtensionDirector parent;
+    /**
+     * 拓展作用范围
+     */
     private final ExtensionScope scope;
+    /**
+     * 扩展处理器
+     */
     private final List<ExtensionPostProcessor> extensionPostProcessors = new ArrayList<>();
+    /**
+     * 范围模型
+     */
     private final ScopeModel scopeModel;
+    /**
+     * 是否摧毁
+     */
     private final AtomicBoolean destroyed = new AtomicBoolean();
 
     public ExtensionDirector(ExtensionDirector parent, ExtensionScope scope, ScopeModel scopeModel) {
@@ -67,42 +92,58 @@ public class ExtensionDirector implements ExtensionAccessor {
     @Override
     @SuppressWarnings("unchecked")
     public <T> ExtensionLoader<T> getExtensionLoader(Class<T> type) {
+        // 检查是否摧毁
         checkDestroyed();
+        // 拓展类型为空抛出异常
         if (type == null) {
             throw new IllegalArgumentException("Extension type == null");
         }
+        // 拓展类型不是接口抛出异常
         if (!type.isInterface()) {
             throw new IllegalArgumentException("Extension type (" + type + ") is not an interface!");
         }
+        // 没有SPI注解
         if (!withExtensionAnnotation(type)) {
             throw new IllegalArgumentException("Extension type (" + type +
                 ") is not an extension, because it is NOT annotated with @" + SPI.class.getSimpleName() + "!");
         }
 
         // 1. find in local cache
+        // 从拓展加载容器中根据类型获取扩展加载器
         ExtensionLoader<T> loader = (ExtensionLoader<T>) extensionLoadersMap.get(type);
 
+        // 从拓展作用域容器中获取拓展作用域
         ExtensionScope scope = extensionScopeMap.get(type);
+        // 如果拓展作用域为空
         if (scope == null) {
+            // 获取注解SPI
             SPI annotation = type.getAnnotation(SPI.class);
+            // 将注解SPI中的scope属性提取
             scope = annotation.scope();
+            // 将获取的拓展作用域放入到拓展作用域容器中
             extensionScopeMap.put(type, scope);
         }
 
+        // 拓展加载器为空，作用域是SELF
         if (loader == null && scope == ExtensionScope.SELF) {
             // create an instance in self scope
+            // 创建拓展加载器
             loader = createExtensionLoader0(type);
         }
 
         // 2. find in parent
+        // 拓展加载器为空
         if (loader == null) {
+            // 父扩展管理器不为空的情况下通过父扩展管理器获取
             if (this.parent != null) {
                 loader = this.parent.getExtensionLoader(type);
             }
         }
 
         // 3. create it
+        // 拓展加载器为空
         if (loader == null) {
+            // 创建拓展加载器
             loader = createExtensionLoader(type);
         }
 
@@ -120,10 +161,14 @@ public class ExtensionDirector implements ExtensionAccessor {
 
     @SuppressWarnings("unchecked")
     private <T> ExtensionLoader<T> createExtensionLoader0(Class<T> type) {
+        // 检查是否摧毁
         checkDestroyed();
         ExtensionLoader<T> loader;
+        // 向拓展加载容器放入数据
         extensionLoadersMap.putIfAbsent(type, new ExtensionLoader<T>(type, this, scopeModel));
+        // 从拓展加载容器中提取数据
         loader = (ExtensionLoader<T>) extensionLoadersMap.get(type);
+        // 返回拓展加载器
         return loader;
     }
 

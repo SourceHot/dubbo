@@ -30,6 +30,7 @@ public enum ExtensionScope {
     /**
      * The extension instance is used within framework, shared with all applications and modules.
      *
+     * 在框架内使用，所有应用模块共享
      * <p>Framework scope SPI extension can only obtain {@link FrameworkModel},
      * cannot get the {@link ApplicationModel} and {@link ModuleModel}.</p>
      *
@@ -49,6 +50,7 @@ public enum ExtensionScope {
      * <p>Application scope SPI extension can obtain {@link FrameworkModel} and {@link ApplicationModel},
      * cannot get the {@link ModuleModel}.</p>
      *
+     * 扩展实例在一个应用程序中使用，与应用程序的所有模块共享，不同的应用程序创建不同的扩展实例。
      * <p></p>
      * Consideration:
      * <ol>
@@ -61,6 +63,7 @@ public enum ExtensionScope {
     /**
      * The extension instance is used within one module, and different modules create different extension instances.
      *
+     * 扩展实例在一个模块内使用，不同的模块创建不同的扩展实例
      * <p>Module scope SPI extension can obtain {@link FrameworkModel}, {@link ApplicationModel} and {@link ModuleModel}.</p>
      *
      * <p></p>
@@ -73,6 +76,7 @@ public enum ExtensionScope {
 
     /**
      * self-sufficient, creates an instance for per scope, for special SPI extension, like {@link ExtensionInjector}
+     * 每次都创建一个实例
      */
     SELF
 }
