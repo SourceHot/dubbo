@@ -97,29 +97,31 @@ public class ExtensionLoader<T> {
     private static final Logger logger = LoggerFactory.getLogger(ExtensionLoader.class);
 
     private static final Pattern NAME_SEPARATOR = Pattern.compile("\\s*[,]+\\s*");
-
+    /**
+     * 加载策略集合
+     */
+    private static volatile LoadingStrategy[] strategies = loadLoadingStrategies();
     /**
      * 拓展类和拓展实例映射
      */
     private final ConcurrentMap<Class<?>, Object> extensionInstances = new ConcurrentHashMap<>(64);
-
     /**
      * 拓展类
      */
     private final Class<?> type;
-
     /**
      * 拓展注入器
      */
     private final ExtensionInjector injector;
-
     /**
      * 拓展类和名称的映射
      */
     private final ConcurrentMap<Class<?>, String> cachedNames = new ConcurrentHashMap<>();
-
+    /***
+     * key: 拓展名称
+     * value： 扩展类
+     */
     private final Holder<Map<String, Class<?>>> cachedClasses = new Holder<>();
-
     private final Map<String, Object> cachedActivates = Collections.synchronizedMap(new LinkedHashMap<>());
     private final Map<String, Set<String>> cachedActivateGroups = Collections.synchronizedMap(new LinkedHashMap<>());
     private final Map<String, String[][]> cachedActivateValues = Collections.synchronizedMap(new LinkedHashMap<>());
@@ -128,43 +130,47 @@ public class ExtensionLoader<T> {
      * 自适应拓展实例缓存
      */
     private final Holder<Object> cachedAdaptiveInstance = new Holder<>();
+    /**
+     * 异常容器
+     */
+    private final Map<String, IllegalStateException> exceptions = new ConcurrentHashMap<>();
+    /**
+     * Record all unacceptable exceptions when using SPI
+     */
+    private final Set<String> unacceptableExceptions = new ConcurrentHashSet<>();
+    private final ExtensionDirector extensionDirector;
+    private final List<ExtensionPostProcessor> extensionPostProcessors;
+    private final ActivateComparator activateComparator;
+    private final ScopeModel scopeModel;
+    private final AtomicBoolean destroyed = new AtomicBoolean();
     private volatile Class<?> cachedAdaptiveClass = null;
     private String cachedDefaultName;
     /**
      * 创建自适应实例错误
      */
     private volatile Throwable createAdaptiveInstanceError;
-
     private Set<Class<?>> cachedWrapperClasses;
-
-    /**
-     * 异常容器
-     */
-    private Map<String, IllegalStateException> exceptions = new ConcurrentHashMap<>();
-
-    /**
-     * 加载策略集合
-     */
-    private static volatile LoadingStrategy[] strategies = loadLoadingStrategies();
-
-    /**
-     * Record all unacceptable exceptions when using SPI
-     */
-    private Set<String> unacceptableExceptions = new ConcurrentHashSet<>();
-    private ExtensionDirector extensionDirector;
-    private List<ExtensionPostProcessor> extensionPostProcessors;
     /**
      * 实例化策略
      */
     private InstantiationStrategy instantiationStrategy;
-    private ActivateComparator activateComparator;
-    private ScopeModel scopeModel;
-    private AtomicBoolean destroyed = new AtomicBoolean();
 
-    public static void setLoadingStrategies(LoadingStrategy... strategies) {
-        if (ArrayUtils.isNotEmpty(strategies)) {
-            ExtensionLoader.strategies = strategies;
-        }
+    ExtensionLoader(Class<?> type, ExtensionDirector extensionDirector, ScopeModel scopeModel) {
+        // 设置类型
+        this.type = type;
+        // 设置扩展管理器
+        this.extensionDirector = extensionDirector;
+        // 获取扩展处理器（ExtensionPostProcessor）
+        this.extensionPostProcessors = extensionDirector.getExtensionPostProcessors();
+        // 初始化InstantiationStrategy接口
+        initInstantiationStrategy();
+        // 初始化拓展注入器
+        this.injector = (type == ExtensionInjector.class ? null : extensionDirector.getExtensionLoader(ExtensionInjector.class)
+            .getAdaptiveExtension());
+        // 初始化比较器
+        this.activateComparator = new ActivateComparator(extensionDirector);
+        // 设置作用域
+        this.scopeModel = scopeModel;
     }
 
     /**
@@ -191,30 +197,10 @@ public class ExtensionLoader<T> {
         return asList(strategies);
     }
 
-    ExtensionLoader(Class<?> type, ExtensionDirector extensionDirector, ScopeModel scopeModel) {
-        // 设置类型
-        this.type = type;
-        // 设置扩展管理器
-        this.extensionDirector = extensionDirector;
-        // 获取扩展处理器（ExtensionPostProcessor）
-        this.extensionPostProcessors = extensionDirector.getExtensionPostProcessors();
-        // 初始化InstantiationStrategy接口
-        initInstantiationStrategy();
-        // 初始化拓展注入器
-        this.injector = (type == ExtensionInjector.class ? null : extensionDirector.getExtensionLoader(ExtensionInjector.class)
-            .getAdaptiveExtension());
-        // 初始化比较器
-        this.activateComparator = new ActivateComparator(extensionDirector);
-        // 设置作用域
-        this.scopeModel = scopeModel;
-    }
-
-    private void initInstantiationStrategy() {
-        instantiationStrategy = extensionPostProcessors.stream()
-            .filter(extensionPostProcessor -> extensionPostProcessor instanceof ScopeModelAccessor)
-            .map(extensionPostProcessor -> new InstantiationStrategy((ScopeModelAccessor) extensionPostProcessor))
-            .findFirst()
-            .orElse(new InstantiationStrategy());
+    public static void setLoadingStrategies(LoadingStrategy... strategies) {
+        if (ArrayUtils.isNotEmpty(strategies)) {
+            ExtensionLoader.strategies = strategies;
+        }
     }
 
     /**
@@ -231,6 +217,14 @@ public class ExtensionLoader<T> {
 
     @Deprecated
     public static void resetExtensionLoader(Class type) {
+    }
+
+    private void initInstantiationStrategy() {
+        instantiationStrategy = extensionPostProcessors.stream()
+            .filter(extensionPostProcessor -> extensionPostProcessor instanceof ScopeModelAccessor)
+            .map(extensionPostProcessor -> new InstantiationStrategy((ScopeModelAccessor) extensionPostProcessor))
+            .findFirst()
+            .orElse(new InstantiationStrategy());
     }
 
     public void destroy() {
@@ -320,6 +314,7 @@ public class ExtensionLoader<T> {
 
     /**
      * Get activate extensions.
+     * 获取激活扩展
      *
      * @param url    url
      * @param values extension point names
@@ -529,37 +524,54 @@ public class ExtensionLoader<T> {
      * will be thrown.
      */
     public T getExtension(String name) {
+        // 通过getExtension方法获取拓展实例
         T extension = getExtension(name, true);
+        // 如果拓展实例为空抛出异常
         if (extension == null) {
             throw new IllegalArgumentException("Not find extension: " + name);
         }
+        // 返回扩展实例
         return extension;
     }
 
     @SuppressWarnings("unchecked")
     public T getExtension(String name, boolean wrap) {
+        // 检查是否已经摧毁，
         checkDestroyed();
+        // 名称如果为空抛出异常
         if (StringUtils.isEmpty(name)) {
             throw new IllegalArgumentException("Extension name == null");
         }
+        // 名称如果是true字符串
         if ("true".equals(name)) {
+            // 获取默认的拓展
             return getDefaultExtension();
         }
+        // 缓存键设置为参数name
         String cacheKey = name;
+        // 如果不需要包装，缓存键添加_origin标识
         if (!wrap) {
             cacheKey += "_origin";
         }
+        // 通过getOrCreateHolder方法根据缓存键获取持有器
         final Holder<Object> holder = getOrCreateHolder(cacheKey);
+        // 从持有器中获取实际对象
         Object instance = holder.get();
+        // 实际对象为空
         if (instance == null) {
             synchronized (holder) {
+                // 从持有器中获取实际对象
                 instance = holder.get();
+                // 实际对象为空
                 if (instance == null) {
+                    // 创建拓展实例
                     instance = createExtension(name, wrap);
+                    // 设置到持有器中
                     holder.set(instance);
                 }
             }
         }
+        // 返回拓展实例
         return (T) instance;
     }
 
@@ -577,10 +589,12 @@ public class ExtensionLoader<T> {
      * Return default extension, return <code>null</code> if it's not configured.
      */
     public T getDefaultExtension() {
+        // 获取拓展类
         getExtensionClasses();
         if (StringUtils.isBlank(cachedDefaultName) || "true".equals(cachedDefaultName)) {
             return null;
         }
+        // 获取扩展实例
         return getExtension(cachedDefaultName);
     }
 
@@ -732,11 +746,13 @@ public class ExtensionLoader<T> {
                 // 扩展实例为空的情况下创建并放入到自适应拓展实例缓存
                 if (instance == null) {
                     try {
+                        // 创建实例
                         instance = createAdaptiveExtension();
+                        // 向自适应拓展实例缓存设置实例
                         cachedAdaptiveInstance.set(instance);
                     } catch (Throwable t) {
                         createAdaptiveInstanceError = t;
-                        throw new IllegalStateException("Failed to create adaptive instance: " + t.toString(), t);
+                        throw new IllegalStateException("Failed to create adaptive instance: " + t, t);
                     }
                 }
             }
@@ -927,11 +943,14 @@ public class ExtensionLoader<T> {
     }
 
     private Map<String, Class<?>> getExtensionClasses() {
+        // 获取扩展名称和扩展类的映射表
         Map<String, Class<?>> classes = cachedClasses.get();
+        // 扩展映射表为空
         if (classes == null) {
             synchronized (cachedClasses) {
                 classes = cachedClasses.get();
                 if (classes == null) {
+                    // 加载扩展映射表
                     classes = loadExtensionClasses();
                     cachedClasses.set(classes);
                 }
@@ -946,15 +965,21 @@ public class ExtensionLoader<T> {
     @SuppressWarnings("deprecation")
     private Map<String, Class<?>> loadExtensionClasses() {
         checkDestroyed();
+        // 设置成员变量cachedDefaultName
         cacheDefaultExtensionName();
 
+        // 创建返回对象
         Map<String, Class<?>> extensionClasses = new HashMap<>();
 
+        // 循环加载策略
         for (LoadingStrategy strategy : strategies) {
+            // 加载资源文件
             loadDirectory(extensionClasses, strategy, type.getName());
 
             // compatible with old ExtensionFactory
+            // 如果成员变量type是ExtensionInjector类型
             if (this.type == ExtensionInjector.class) {
+                // 加载资源文件
                 loadDirectory(extensionClasses, strategy, ExtensionFactory.class.getName());
             }
         }
@@ -974,18 +999,24 @@ public class ExtensionLoader<T> {
      * extract and cache default extension name if exists
      */
     private void cacheDefaultExtensionName() {
+        // 在成员变量type，上找到SPI注解
         final SPI defaultAnnotation = type.getAnnotation(SPI.class);
+        // 如果SPI注解为空，结束处理
         if (defaultAnnotation == null) {
             return;
         }
 
+        // 获取SPI注解的value属性
         String value = defaultAnnotation.value();
         if ((value = value.trim()).length() > 0) {
+            // 根据正则切分
             String[] names = NAME_SEPARATOR.split(value);
+            // 如果切分后数量大于1抛出异常
             if (names.length > 1) {
                 throw new IllegalStateException("More than 1 default extension name on extension " + type.getName()
                     + ": " + Arrays.toString(names));
             }
+            // 将切分后的第一个索引复制给成员变量cachedDefaultName
             if (names.length == 1) {
                 cachedDefaultName = names[0];
             }
@@ -995,33 +1026,47 @@ public class ExtensionLoader<T> {
     private void loadDirectory(Map<String, Class<?>> extensionClasses, String dir, String type,
                                boolean extensionLoaderClassLoaderFirst, boolean overridden, String[] includedPackages,
                                String[] excludedPackages, String[] onlyExtensionClassLoaderPackages) {
+        // 组装文件名称，文件夹+类型
         String fileName = dir + type;
         try {
+            // 类加载器
             List<ClassLoader> classLoadersToLoad = new LinkedList<>();
 
             // try to load from ExtensionLoader's ClassLoader first
+            // 是否优先使用扩展类加载器
             if (extensionLoaderClassLoaderFirst) {
+                // 获取ExtensionLoader类的类加载器
                 ClassLoader extensionLoaderClassLoader = ExtensionLoader.class.getClassLoader();
+                // 系统类加载器和ExtensionLoader类的类加载器不相同则将其加入到类加载器集合中
                 if (ClassLoader.getSystemClassLoader() != extensionLoaderClassLoader) {
                     classLoadersToLoad.add(extensionLoaderClassLoader);
                 }
             }
 
             // load from scope model
+            // 获取作用域模型的类加载器
             Set<ClassLoader> classLoaders = scopeModel.getClassLoaders();
 
+            // 如果作用域模型的类加载器为空
             if (CollectionUtils.isEmpty(classLoaders)) {
+                // 将文件名称转换为URL资源对象
                 Enumeration<java.net.URL> resources = ClassLoader.getSystemResources(fileName);
+                // 资源对象不为空
                 if (resources != null) {
+                    // 判断是否存在资源信息
                     while (resources.hasMoreElements()) {
+                        // 加载资源
                         loadResource(extensionClasses, null, resources.nextElement(), overridden, includedPackages, excludedPackages, onlyExtensionClassLoaderPackages);
                     }
                 }
             } else {
+                // 将作用域模型的类加载器放入到类加载器集合中
                 classLoadersToLoad.addAll(classLoaders);
             }
 
+            // 通过ClassLoaderResourceLoader.loadResources获取类加载器和URL映射
             Map<ClassLoader, Set<java.net.URL>> resources = ClassLoaderResourceLoader.loadResources(fileName, classLoadersToLoad);
+            // 循环变量resources通过loadFromClass方法加载资源，底层loadResource方法
             resources.forEach(((classLoader, urls) ->
                 loadFromClass(extensionClasses, overridden, urls, classLoader, includedPackages, excludedPackages, onlyExtensionClassLoaderPackages)));
         } catch (Throwable t) {
@@ -1045,6 +1090,7 @@ public class ExtensionLoader<T> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(resourceURL.openStream(), StandardCharsets.UTF_8))) {
                 String line;
                 String clazz;
+                // 字符串操作，得到等号前后的数据，前面的是name后面的是clzz
                 while ((line = reader.readLine()) != null) {
                     final int ci = line.indexOf('#');
                     if (ci >= 0) {
@@ -1063,6 +1109,7 @@ public class ExtensionLoader<T> {
                             }
                             if (StringUtils.isNotEmpty(clazz) && !isExcluded(clazz, excludedPackages) && isIncluded(clazz, includedPackages)
                                 && !isExcludedByClassLoader(clazz, classLoader, onlyExtensionClassLoaderPackages)) {
+                                // 加载类
                                 loadClass(extensionClasses, resourceURL, Class.forName(clazz, true, classLoader), name, overridden);
                             }
                         } catch (Throwable t) {
@@ -1119,28 +1166,36 @@ public class ExtensionLoader<T> {
 
     private void loadClass(Map<String, Class<?>> extensionClasses, java.net.URL resourceURL, Class<?> clazz, String name,
                            boolean overridden) {
+        // clazz不是type同源，抛出异常
         if (!type.isAssignableFrom(clazz)) {
             throw new IllegalStateException("Error occurred when loading extension class (interface: " +
                 type + ", class line: " + clazz.getName() + "), class "
                 + clazz.getName() + " is not subtype of interface.");
         }
+        // clazz中寻找Adaptive注解，如果存在进行处理
         if (clazz.isAnnotationPresent(Adaptive.class)) {
             cacheAdaptiveClass(clazz, overridden);
-        } else if (isWrapperClass(clazz)) {
+        }
+        // 判断是否是包装类，如果是则进行处理
+        else if (isWrapperClass(clazz)) {
             cacheWrapperClass(clazz);
         } else {
             if (StringUtils.isEmpty(name)) {
+                // 寻找Extension注解名称
                 name = findAnnotationName(clazz);
                 if (name.length() == 0) {
                     throw new IllegalStateException("No such extension name for the class " + clazz.getName() + " in the config " + resourceURL);
                 }
             }
 
+            //
             String[] names = NAME_SEPARATOR.split(name);
             if (ArrayUtils.isNotEmpty(names)) {
                 cacheActivateClass(clazz, names[0]);
                 for (String n : names) {
+                    // 缓存类和名称
                     cacheName(clazz, n);
+                    // 缓存扩展类和名称
                     saveInExtensionClass(extensionClasses, clazz, n, overridden);
                 }
             }

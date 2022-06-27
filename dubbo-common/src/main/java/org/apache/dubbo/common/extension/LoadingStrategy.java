@@ -23,8 +23,16 @@ import org.apache.dubbo.common.lang.Prioritized;
  */
 public interface LoadingStrategy extends Prioritized {
 
+    /**
+     * 目录
+     * @return
+     */
     String directory();
 
+    /**
+     * 是否优先使用扩展类加载器
+     * @return
+     */
     default boolean preferExtensionClassLoader() {
         return false;
     }
@@ -73,6 +81,7 @@ public interface LoadingStrategy extends Prioritized {
     /**
      * Indicates current {@link LoadingStrategy} supports overriding other lower prioritized instances or not.
      *
+     * 是否覆盖优先级较低的实例
      * @return if supports, return <code>true</code>, or <code>false</code>
      * @since 2.7.7
      */

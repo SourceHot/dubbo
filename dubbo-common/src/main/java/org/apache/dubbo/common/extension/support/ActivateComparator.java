@@ -56,7 +56,7 @@ public class ActivateComparator implements Comparator<Class<?>> {
         }
 
 
-        //
+        // 提取 SPI
         Class<?> inf = findSpi(o1);
 
         // 获取注解Activate对应的信息类
