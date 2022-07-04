@@ -787,36 +787,57 @@ public class ExtensionLoader<T> {
 
     @SuppressWarnings("unchecked")
     private T createExtension(String name, boolean wrap) {
+        // 获取参数name对应的类
         Class<?> clazz = getExtensionClasses().get(name);
+        // 如果类对象为空，或者参数name在不可受理的名称集合中，抛出异常
         if (clazz == null || unacceptableExceptions.contains(name)) {
             throw findException(name);
         }
         try {
+            // 从拓展实例容器中获取扩展实例
             T instance = (T) extensionInstances.get(clazz);
+            // 如果扩展实例为空
             if (instance == null) {
+                // 向扩展实例中添加数据，key为类，value为扩展实例
                 extensionInstances.putIfAbsent(clazz, createExtensionInstance(clazz));
                 instance = (T) extensionInstances.get(clazz);
+                // 前置处理
                 instance = postProcessBeforeInitialization(instance, name);
+                // 注入扩展
                 injectExtension(instance);
+                // 后置处理
                 instance = postProcessAfterInitialization(instance, name);
             }
 
+            // 如果是需要包装的
             if (wrap) {
+                // 包装类集合
                 List<Class<?>> wrapperClassesList = new ArrayList<>();
+                // 成员变量cachedWrapperClasses不为空的情况下
                 if (cachedWrapperClasses != null) {
+                    // 向包装类集合中添加cachedWrapperClasses变量
                     wrapperClassesList.addAll(cachedWrapperClasses);
+                    // 包装类集合排序
                     wrapperClassesList.sort(WrapperComparator.COMPARATOR);
+                    // 翻转包装类集合
                     Collections.reverse(wrapperClassesList);
                 }
 
+                // 包装类集合不为空
                 if (CollectionUtils.isNotEmpty(wrapperClassesList)) {
+                    // 循环包装类集合
                     for (Class<?> wrapperClass : wrapperClassesList) {
+                        // 获取Wrapper注解
                         Wrapper wrapper = wrapperClass.getAnnotation(Wrapper.class);
+                        // 判断是否参数name是否和Wrapper注解中的条件匹配
                         boolean match = (wrapper == null) ||
                             ((ArrayUtils.isEmpty(wrapper.matches()) || ArrayUtils.contains(wrapper.matches(), name)) &&
                                 !ArrayUtils.contains(wrapper.mismatches(), name));
+                        // 如果匹配
                         if (match) {
+                            // 注入扩展
                             instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
+                            // 后置处理
                             instance = postProcessAfterInitialization(instance, name);
                         }
                     }
@@ -824,6 +845,7 @@ public class ExtensionLoader<T> {
             }
 
             // Warning: After an instance of Lifecycle is wrapped by cachedWrapperClasses, it may not still be Lifecycle instance, this application may not invoke the lifecycle.initialize hook.
+            // 实例化扩展
             initExtension(instance);
             return instance;
         } catch (Throwable t) {
@@ -836,6 +858,13 @@ public class ExtensionLoader<T> {
         return instantiationStrategy.instantiate(type);
     }
 
+    /**
+     * 前置处理
+     * @param instance
+     * @param name
+     * @return
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     private T postProcessBeforeInitialization(T instance, String name) throws Exception {
         if (extensionPostProcessors != null) {
@@ -846,6 +875,13 @@ public class ExtensionLoader<T> {
         return instance;
     }
 
+    /**
+     * 后置处理
+     * @param instance
+     * @param name
+     * @return
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     private T postProcessAfterInitialization(T instance, String name) throws Exception {
         if (instance instanceof ExtensionAccessorAware) {
