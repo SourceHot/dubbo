@@ -33,12 +33,14 @@ public interface RemotingServer extends Endpoint, Resetable, IdleSensible {
     /**
      * is bound.
      *
+     * 判断是否绑定端口
      * @return bound
      */
     boolean isBound();
 
     /**
      * get channels.
+     * 获取通道集合
      *
      * @return channels
      */
@@ -47,11 +49,16 @@ public interface RemotingServer extends Endpoint, Resetable, IdleSensible {
     /**
      * get channel.
      *
+     * 根据网络地址获取通道
      * @param remoteAddress
      * @return channel
      */
     Channel getChannel(InetSocketAddress remoteAddress);
 
+    /**
+     * 重置
+     * @param parameters
+     */
     @Deprecated
     void reset(org.apache.dubbo.common.Parameters parameters);
 

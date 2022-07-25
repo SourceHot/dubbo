@@ -24,11 +24,13 @@ import java.util.concurrent.ExecutorService;
 
 /**
  * ExchangeChannel. (API/SPI, Prototype, ThreadSafe)
+ * 信息交换通道
  */
 public interface ExchangeChannel extends Channel {
 
     /**
      * send request.
+     * 发送请求
      *
      * @param request
      * @return response future
@@ -39,7 +41,6 @@ public interface ExchangeChannel extends Channel {
 
     /**
      * send request.
-     *
      * @param request
      * @param timeout
      * @return response future
@@ -70,6 +71,7 @@ public interface ExchangeChannel extends Channel {
     /**
      * get message handler.
      *
+     * 获取消息处理器
      * @return message handler
      */
     ExchangeHandler getExchangeHandler();
@@ -77,6 +79,7 @@ public interface ExchangeChannel extends Channel {
     /**
      * graceful close.
      *
+     * 关闭
      * @param timeout
      */
     @Override

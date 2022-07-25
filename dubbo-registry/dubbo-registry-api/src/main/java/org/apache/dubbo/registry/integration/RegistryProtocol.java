@@ -233,11 +233,15 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
         //  the same service. Because the subscribed is cached key with the name of the service, it causes the
         //  subscription information to cover.
 
+        // 获取需要覆盖的订阅地址
         final URL overrideSubscribeUrl = getSubscribedOverrideUrl(providerUrl);
+        // 创建覆盖监听器
         final OverrideListener overrideSubscribeListener = new OverrideListener(overrideSubscribeUrl, originInvoker);
+        // 获取覆盖监听器，将新建的覆盖监听器加入其中
         Map<URL, NotifyListener> overrideListeners = getProviderConfigurationListener(providerUrl).getOverrideListeners();
         overrideListeners.put(registryUrl, overrideSubscribeListener);
 
+        // 覆盖数据
         providerUrl = overrideUrlWithConfig(providerUrl, overrideSubscribeListener);
         //export invoker
         // 暴露服务
@@ -262,9 +266,12 @@ public class RegistryProtocol implements Protocol, ScopeModelAware {
         registerStatedUrl(registryUrl, registeredProviderUrl, register);
 
 
+        // 设置注册地址
         exporter.setRegisterUrl(registeredProviderUrl);
+        // 设置订阅地址
         exporter.setSubscribeUrl(overrideSubscribeUrl);
 
+        // 服务是否被发现，没有的情况下订阅
         if (!registry.isServiceDiscovery()) {
             // Deprecated! Subscribe to override rules in 2.6.x or before.
             registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);

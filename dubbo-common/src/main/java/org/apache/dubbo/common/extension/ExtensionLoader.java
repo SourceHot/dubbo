@@ -607,6 +607,10 @@ public class ExtensionLoader<T> {
         return c != null;
     }
 
+    /**
+     * 获取支持的扩展类型
+     * @return
+     */
     public Set<String> getSupportedExtensions() {
         checkDestroyed();
         Map<String, Class<?>> classes = getExtensionClasses();
@@ -900,29 +904,37 @@ public class ExtensionLoader<T> {
     }
 
     private T injectExtension(T instance) {
+        // 如果实例对象为空
         if (injector == null) {
             return instance;
         }
 
         try {
+            // 遍历所有方法
             for (Method method : instance.getClass().getMethods()) {
+                // 如果不是set方法跳过处理
                 if (!isSetter(method)) {
                     continue;
                 }
                 /**
                  * Check {@link DisableInject} to see if we need auto injection for this property
                  */
+                // 如果方法存在DisableInject注解跳过处理
                 if (method.isAnnotationPresent(DisableInject.class)) {
                     continue;
                 }
                 Class<?> pt = method.getParameterTypes()[0];
+                // 如果类型是原始类型（基本数据类型 int double）跳过处理
                 if (ReflectUtils.isPrimitives(pt)) {
                     continue;
                 }
 
                 try {
+                    // 获取需要设置的属性名称
                     String property = getSetterProperty(method);
+                    // 通过ExtensionInjector接口实现类获取具体对象
                     Object object = injector.getInstance(pt, property);
+                    // 在具体对象不为空的情况下设置属性
                     if (object != null) {
                         method.invoke(instance, object);
                     }

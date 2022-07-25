@@ -26,11 +26,30 @@ import io.netty.handler.ssl.SslContext;
 @SPI(scope = ExtensionScope.FRAMEWORK)
 public interface WireProtocol {
 
+    /**
+     * 协议探测器
+     * @return
+     */
     ProtocolDetector detector();
 
+    /**
+     * 配置服务端通道
+     * @param url
+     * @param pipeline
+     * @param sslContext
+     */
     void configServerPipeline(URL url, ChannelPipeline pipeline, SslContext sslContext);
 
+    /**
+     * 配置客户端通道
+     * @param url
+     * @param pipeline
+     * @param sslContext
+     */
     void configClientPipeline(URL url, ChannelPipeline pipeline, SslContext sslContext);
 
+    /**
+     * 关闭
+     */
     void close();
 }

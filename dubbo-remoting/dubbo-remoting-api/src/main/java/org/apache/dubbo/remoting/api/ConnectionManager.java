@@ -22,6 +22,9 @@ import org.apache.dubbo.common.extension.SPI;
 
 import java.util.function.Consumer;
 
+/**
+ * 连接管理器
+ */
 @SPI(scope = ExtensionScope.FRAMEWORK)
 public interface ConnectionManager {
 

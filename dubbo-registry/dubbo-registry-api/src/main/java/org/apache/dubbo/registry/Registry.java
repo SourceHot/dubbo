@@ -37,7 +37,7 @@ public interface Registry extends Node, RegistryService {
     }
 
     /**
-     * 是否被服务发现
+     * 服务是否被发现
      * @return
      */
     default boolean isServiceDiscovery() {

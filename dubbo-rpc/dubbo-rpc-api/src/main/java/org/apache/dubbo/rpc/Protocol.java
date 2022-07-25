@@ -26,6 +26,7 @@ import java.util.List;
 
 /**
  * Protocol. (API/SPI, Singleton, ThreadSafe)
+ * 协议接口
  */
 @SPI(value = "dubbo", scope = ExtensionScope.FRAMEWORK)
 public interface Protocol {
@@ -33,11 +34,16 @@ public interface Protocol {
     /**
      * Get default port when user doesn't config the port.
      *
+     * 获取默认端口
      * @return default port
      */
     int getDefaultPort();
 
     /**
+     * 导出方法
+     * 1. 协议收到请求后要记录请求源地址
+     * 2. 幂等
+     * 3. Invoker框架传输
      * Export service for remote invocation: <br>
      * 1. Protocol should record request source address after receive a request:
      * RpcContext.getServerAttachment().setRemoteAddress();<br>

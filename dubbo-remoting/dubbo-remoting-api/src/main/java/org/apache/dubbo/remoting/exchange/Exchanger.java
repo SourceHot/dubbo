@@ -29,6 +29,7 @@ import org.apache.dubbo.remoting.exchange.support.header.HeaderExchanger;
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Message_Exchange_Pattern">Message Exchange Pattern</a>
  * <a href="http://en.wikipedia.org/wiki/Request-response">Request-Response</a>
+ * 信息交换器
  */
 @SPI(value = HeaderExchanger.NAME, scope = ExtensionScope.FRAMEWORK)
 public interface Exchanger {
@@ -36,6 +37,7 @@ public interface Exchanger {
     /**
      * bind.
      *
+     * 将url和信息交换处理器绑定
      * @param url
      * @param handler
      * @return message server
@@ -46,6 +48,7 @@ public interface Exchanger {
     /**
      * connect.
      *
+     * 连接服务器
      * @param url
      * @param handler
      * @return message channel
